@@ -8,7 +8,7 @@ import urllib.parse
 import struct
 from decimal import Decimal, ROUND_DOWN
 
-DEBUG = False
+DEBUG = True
 
 logging.basicConfig(
     level=logging.INFO if DEBUG else logging.ERROR,
@@ -149,7 +149,8 @@ def decode_pair(data):
         return None
 
 async def connect_to_dexscreener():
-    base_uri = "wss://io.dexscreener.com/dex/screener/v4/pairs/h24/1"
+    # WebSocket connection parameters - FIXED VERSION
+    base_uri = "wss://io.dexscreener.com/dex/screener/v5/pairs/h24/37"
     params = {
         "rankBy[key]": "trendingScoreH6",
         "rankBy[order]": "desc",
@@ -157,20 +158,27 @@ async def connect_to_dexscreener():
     }
     uri = f"{base_uri}?{urllib.parse.urlencode(params)}"
 
+    # Prepare headers - FIXED VERSION
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:132.0) Gecko/20100101 Firefox/132.0',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
         'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',  # Removed 'br' to avoid Brotli compression issues
         'Sec-WebSocket-Version': '13',
         'Origin': 'https://dexscreener.com',
+        'Sec-Fetch-Dest': 'websocket',
+        'Sec-Fetch-Mode': 'websocket',
+        'Sec-Fetch-Site': 'same-site',
         'Connection': 'Upgrade',
         'Pragma': 'no-cache',
         'Cache-Control': 'no-cache',
         'Upgrade': 'websocket',
     }
 
+    # SSL Context - FIXED VERSION
     ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
 
     while True:
         try:
@@ -191,7 +199,6 @@ async def connect_to_dexscreener():
                         if isinstance(message, bytes):
                             if not message.startswith(b'\x00\n1.3.0\n'):
                                 continue
-
                             pairs_start = message.find(b'pairs')
                             if pairs_start == -1:
                                 continue
@@ -205,7 +212,8 @@ async def connect_to_dexscreener():
                                 pos += 512
 
                             if pairs:
-                                print(json.dumps({"type": "pairs", "pairs": pairs}, indent=None))
+                                # Match original output format but with indentation for readability
+                                print(json.dumps({"type": "pairs", "pairs": pairs}, indent=2))
 
                     except websockets.exceptions.ConnectionClosed:
                         break
